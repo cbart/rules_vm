@@ -1,0 +1,101 @@
+# Copyright 2024 Cezary Bartoszuk
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+workspace(name = "rules_vm")
+
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+# aspect_bazel_lib https://github.com/bazel-contrib/bazel-lib/releases/tag/v2.10.0
+http_archive(
+    name = "aspect_bazel_lib",
+    sha256 = "7b39d9f38b82260a8151b18dd4a6219d2d7fc4a0ac313d4f5a630ae6907d205d",
+    strip_prefix = "bazel-lib-2.10.0",
+    url = "https://github.com/bazel-contrib/bazel-lib/releases/download/v2.10.0/bazel-lib-v2.10.0.tar.gz",
+)
+load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies", "aspect_bazel_lib_register_toolchains")
+aspect_bazel_lib_dependencies()
+aspect_bazel_lib_register_toolchains()
+
+# bazel_skylib https://github.com/bazelbuild/bazel-skylib/releases/tag/1.7.1
+http_archive(
+    name = "bazel_skylib",
+    sha256 = "bc283cdfcd526a52c3201279cda4bc298652efa898b10b4db0837dc51652756f",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.7.1/bazel-skylib-1.7.1.tar.gz",
+        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.7.1/bazel-skylib-1.7.1.tar.gz",
+    ],
+)
+load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
+bazel_skylib_workspace()
+
+# rules_pkg https://github.com/bazelbuild/rules_pkg/releases/tag/1.0.1
+http_archive(
+    name = "rules_pkg",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/1.0.1/rules_pkg-1.0.1.tar.gz",
+        "https://github.com/bazelbuild/rules_pkg/releases/download/1.0.1/rules_pkg-1.0.1.tar.gz",
+    ],
+    sha256 = "d20c951960ed77cb7b341c2a59488534e494d5ad1d30c4818c736d57772a9fef",
+)
+load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
+rules_pkg_dependencies()
+
+# toolchains_llvm https://github.com/bazel-contrib/toolchains_llvm/releases/tag/v1.2.0
+http_archive(
+    name = "toolchains_llvm",
+    sha256 = "e3fb6dc6b77eaf167cb2b0c410df95d09127cbe20547e5a329c771808a816ab4",
+    strip_prefix = "toolchains_llvm-v1.2.0",
+    canonical_id = "v1.2.0",
+    url = "https://github.com/bazel-contrib/toolchains_llvm/releases/download/v1.2.0/toolchains_llvm-v1.2.0.tar.gz",
+)
+load("@toolchains_llvm//toolchain:deps.bzl", "bazel_toolchain_dependencies")
+bazel_toolchain_dependencies()
+load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
+llvm_toolchain(
+    name = "llvm_toolchain",
+    llvm_versions = {
+        "": "16.0.0",
+        "darwin-x86_64": "15.0.7",
+    },
+)
+load("@llvm_toolchain//:toolchains.bzl", "llvm_register_toolchains")
+llvm_register_toolchains()
+
+# org_chromium_sysroot_linux_x64
+http_archive(
+    name = "org_chromium_sysroot_linux_x64",
+    build_file_content = """
+filegroup(
+  name = "sysroot",
+  srcs = glob(["*/**"]),
+  visibility = ["//visibility:public"],
+)
+""",
+    sha256 = "84656a6df544ecef62169cfe3ab6e41bb4346a62d3ba2a045dc5a0a2ecea94a3",
+    urls = ["https://commondatastorage.googleapis.com/chrome-linux-sysroot/toolchain/2202c161310ffde63729f29d27fe7bb24a0bc540/debian_stretch_amd64_sysroot.tar.xz"],
+)
+llvm_toolchain(
+    name = "llvm_toolchain_with_sysroot",
+    llvm_version = "16.0.0",
+    sysroot = {
+        "linux-x86_64": "@org_chromium_sysroot_linux_x64//:sysroot",
+    },
+    toolchain_roots = {
+        "": "@llvm_toolchain_llvm//",
+    },
+)
+
+register_toolchains(
+    "@llvm_toolchain_with_sysroot//:cc-toolchain-x86_64-linux",
+)
